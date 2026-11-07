@@ -74,7 +74,7 @@ jobs:
         run: |
           sfmigrate translate examples/legacy --out /tmp/examples
           diff -r docs/examples /tmp/examples
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: eval-report
@@ -95,7 +95,7 @@ jobs:
           /tmp/venv/bin/pip install dist/*.whl
           cd /tmp && /tmp/venv/bin/sfmigrate eval --check
           /tmp/venv/bin/sfmigrate sql --dialect oracle "SELECT * FROM t WHERE ROWNUM <= 5"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
