@@ -1,0 +1,73 @@
+{
+  "files": 8,
+  "statements": 33,
+  "status": {
+    "auto": 16,
+    "assisted": 8,
+    "manual": 2,
+    "dropped": 7
+  },
+  "automation_rate": 0.923,
+  "effort_hours": 12.8,
+  "hours_per_statement": {
+    "auto": 0.05,
+    "dropped": 0.0,
+    "assisted": 0.5,
+    "manual": 4.0
+  },
+  "rules": {
+    "OR010": 1,
+    "OR003": 3,
+    "OR006": 1,
+    "OR004": 2,
+    "OR007": 1,
+    "OR008": 1,
+    "OR002": 1,
+    "OR001": 2,
+    "OR011": 1,
+    "OR009": 1,
+    "TD001": 8,
+    "TD013": 1,
+    "TD006": 2,
+    "TD009": 1,
+    "TD007": 3,
+    "TD002": 2,
+    "TD003": 3,
+    "TD004": 2,
+    "TD005": 6,
+    "TD012": 1,
+    "TD010": 1,
+    "TD008": 1
+  },
+  "kinds": {
+    "sequence": 1,
+    "table": 5,
+    "merge": 2,
+    "query": 6,
+    "insert": 2,
+    "plsql": 1,
+    "bteq": 6,
+    "use": 1,
+    "update": 1,
+    "delete": 1,
+    "command": 3,
+    "statement": 1,
+    "view": 3
+  },
+  "manual": [
+    {
+      "file": "oracle/plsql/refresh_summary.sql",
+      "line": 1,
+      "kind": "plsql",
+      "reason": "PL/SQL needs a rewrite in Snowflake Scripting or the application",
+      "source": "CREATE OR REPLACE PROCEDURE refresh_summary AS"
+    },
+    {
+      "file": "teradata/macros/close_orders.sql",
+      "line": 1,
+      "kind": "statement",
+      "reason": "macros, stored procedures and temporal SQL need to be rewritten by hand",
+      "source": "REPLACE MACRO sales.close_old_orders (cutoff DATE) AS ("
+    }
+  ]
+}

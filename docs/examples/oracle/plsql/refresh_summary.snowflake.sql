@@ -1,0 +1,11 @@
+-- Translated from oracle by sfmigrate: oracle/plsql/refresh_summary.sql
+
+-- [manual] line 1
+--   manual: OR008: PL/SQL needs a rewrite in Snowflake Scripting or the application
+-- CREATE OR REPLACE PROCEDURE refresh_summary AS
+-- BEGIN
+--   DELETE FROM order_summary;
+--   INSERT INTO order_summary (month, total)
+--   SELECT TRUNC(created, 'MM'), SUM(amount) FROM orders GROUP BY TRUNC(created, 'MM');
+--   COMMIT;
+-- END;

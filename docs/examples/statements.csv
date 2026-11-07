@@ -1,0 +1,34 @@
+file,line,dialect,kind,name,status,rules,notes
+oracle/ddl/schema.sql,1,oracle,sequence,orders_seq,auto,,
+oracle/ddl/schema.sql,3,oracle,table,orders,assisted,OR003 OR004 OR006 OR010,"LOB column mapped to VARCHAR/BINARY: check values fit Snowflake's size limits | SYSDATE is the database host's local time in Oracle, UTC in Snowflake: check the session time zone | NUMBER without precision became NUMBER(38, 10); confirm the scale the data needs | Oracle DATE became TIMESTAMP_NTZ(0): Oracle DATE values carry a time of day"
+oracle/ddl/schema.sql,13,oracle,table,employees,auto,OR004,Oracle DATE became TIMESTAMP_NTZ(0): Oracle DATE values carry a time of day
+oracle/etl/merge_customers.sql,1,oracle,merge,customers AS t,auto,,
+oracle/etl/merge_customers.sql,7,oracle,query,orders,assisted,OR007,'' is NULL in Oracle but an empty string in Snowflake: comparisons and NVL behave differently
+oracle/etl/merge_customers.sql,10,oracle,insert,audit_log,auto,OR003,SYSTIMESTAMP became CURRENT_TIMESTAMP()
+oracle/plsql/refresh_summary.sql,1,oracle,plsql,,manual,OR008,PL/SQL needs a rewrite in Snowflake Scripting or the application
+oracle/queries/reports.sql,1,oracle,query,orders AS o,auto,OR002,(+) outer join rewritten to ANSI LEFT JOIN
+oracle/queries/reports.sql,11,oracle,query,orders,assisted,OR001 OR003 OR011,"WHERE ROWNUM <= 100 became LIMIT 100 | SYSDATE is the database host's local time in Oracle, UTC in Snowflake: check the session time zone | date +/- n became DATEADD(DAY, n, ...)"
+oracle/queries/reports.sql,14,oracle,query,orders,assisted,OR001,"ROWNUM with ORDER BY: Oracle limits before sorting, kept with a subquery; confirm that was intended"
+oracle/queries/reports.sql,17,oracle,query,employees,auto,OR009,CONNECT BY kept: Snowflake supports it; a recursive CTE is the portable alternative
+oracle/queries/reports.sql,23,oracle,query,customers,auto,,
+teradata/bteq/daily_load.bteq,1,teradata,bteq,,dropped,TD001,BTEQ command .LOGON dropped: move control flow to the orchestrator
+teradata/bteq/daily_load.bteq,2,teradata,bteq,,dropped,TD001,BTEQ command .SET dropped: move control flow to the orchestrator
+teradata/bteq/daily_load.bteq,4,teradata,use,sales,auto,TD013,DATABASE became USE SCHEMA: a Teradata database maps to a Snowflake schema
+teradata/bteq/daily_load.bteq,6,teradata,table,vt_new_orders,auto,TD006,VOLATILE table became TEMPORARY (session-scoped in both) | ON COMMIT PRESERVE ROWS dropped: Snowflake temporary tables keep rows for the session
+teradata/bteq/daily_load.bteq,12,teradata,bteq,,assisted,TD001,BTEQ command .IF dropped: move control flow to the orchestrator | BTEQ control flow (.IF/.GOTO) changes what runs: rebuild it in the orchestrator
+teradata/bteq/daily_load.bteq,14,teradata,insert,sales.orders,auto,,
+teradata/bteq/daily_load.bteq,17,teradata,update,sales.orders AS t,auto,TD009,Teradata UPDATE ... FROM rewritten to Snowflake's UPDATE ... SET ... FROM
+teradata/bteq/daily_load.bteq,21,teradata,merge,sales.customers AS t,auto,,
+teradata/bteq/daily_load.bteq,27,teradata,delete,staging.orders_raw,auto,,
+teradata/bteq/daily_load.bteq,29,teradata,command,,dropped,TD007,COLLECT STATISTICS dropped: Snowflake maintains statistics automatically
+teradata/bteq/daily_load.bteq,31,teradata,bteq,,assisted,TD001,BTEQ command .IF dropped: move control flow to the orchestrator | BTEQ control flow (.IF/.GOTO) changes what runs: rebuild it in the orchestrator
+teradata/bteq/daily_load.bteq,32,teradata,bteq,,dropped,TD001,BTEQ command .LOGOFF dropped: move control flow to the orchestrator
+teradata/bteq/daily_load.bteq,33,teradata,bteq,,dropped,TD001,BTEQ command .QUIT dropped: move control flow to the orchestrator
+teradata/ddl/sales_tables.sql,1,teradata,table,sales.orders,assisted,TD002 TD003 TD004 TD005,MULTISET dropped: Snowflake tables allow duplicate rows like MULTISET | physical option fallbackproperty dropped | physical option journalproperty dropped | PRIMARY INDEX dropped: distribution is automatic; consider CLUSTER BY for large tables | status: characterset attribute dropped | status: NOT CASESPECIFIC became COLLATE 'en-ci'; comparisons stay case-insensitive | ship_date: dateformat attribute dropped
+teradata/ddl/sales_tables.sql,13,teradata,table,sales.customers,assisted,TD002 TD003 TD004 TD005,SET table: Teradata silently discarded duplicate rows; deduplicate on load | physical option fallbackproperty dropped | UNIQUE index dropped: Snowflake does not enforce uniqueness; check it on load | name: characterset attribute dropped | segment: compress attribute dropped | created: dateformat attribute dropped
+teradata/ddl/sales_tables.sql,22,teradata,command,,dropped,TD007,COLLECT STATISTICS dropped: Snowflake maintains statistics automatically
+teradata/ddl/sales_tables.sql,23,teradata,command,,dropped,TD007,COLLECT STATISTICS dropped: Snowflake maintains statistics automatically
+teradata/macros/close_orders.sql,1,teradata,statement,,manual,TD012,"macros, stored procedures and temporal SQL need to be rewritten by hand"
+teradata/views/reporting_views.sql,1,teradata,view,sales.v_latest_order,auto,TD010,TITLE display attributes were dropped; use column aliases if they matter
+teradata/views/reporting_views.sql,6,teradata,view,sales.v_top_customers,auto,,
+teradata/views/reporting_views.sql,14,teradata,view,sales.v_contact_domains,auto,TD008,"INDEX(string, substring) became CHARINDEX(substring, string)"
