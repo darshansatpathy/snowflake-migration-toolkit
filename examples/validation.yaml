@@ -1,0 +1,18 @@
+# sfmigrate validate examples/validation.yaml
+# Compares a table migrated from Oracle (here staged in PostgreSQL) to its copy in the target.
+source: postgresql://postgres:postgres@localhost:5432/legacy
+target: duckdb:///analytics.duckdb
+# target: snowflake://user:password@account/ANALYTICS/PUBLIC   (needs the snowflake extra)
+rules:
+  numeric_tolerance: 0.0001
+sample: 10
+tables:
+  - name: orders
+    source: legacy.orders
+    target: analytics.orders
+    key: [order_id]
+    exclude: [load_ts]                   # columns added by the load
+    rename: {cust_no: customer_id}       # source column -> target column
+    where: "order_id > 0"                # applied on both sides
+    rules: {trim_trailing: true, empty_as_null: true}
+    source_rules: {timestamp_timezone: Asia/Kolkata}   # the source stored local time

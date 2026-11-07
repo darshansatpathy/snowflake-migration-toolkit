@@ -1,0 +1,33 @@
+.LOGON tdprod/etl_user,${TD_PASSWORD};
+.SET ERROROUT STDOUT
+
+DATABASE sales;
+
+CREATE VOLATILE TABLE vt_new_orders AS (
+    SEL order_id, customer_id, status, amount, ordered_at
+    FROM staging.orders_raw
+    WHERE loaded = 0
+) WITH DATA ON COMMIT PRESERVE ROWS;
+
+.IF ERRORCODE <> 0 THEN .QUIT 8
+
+INS INTO sales.orders (order_id, customer_id, status, amount, ordered_at)
+SEL order_id, customer_id, status, amount, ordered_at FROM vt_new_orders;
+
+UPDATE t FROM sales.orders t, staging.order_fixes f
+SET amount = f.amount
+WHERE t.order_id = f.order_id;
+
+MERGE INTO sales.customers t
+USING staging.customers s
+ON t.customer_id = s.customer_id
+WHEN MATCHED THEN UPDATE SET name = s.name
+WHEN NOT MATCHED THEN INSERT (customer_id, name) VALUES (s.customer_id, s.name);
+
+DEL FROM staging.orders_raw WHERE loaded = 0;
+
+COLLECT STATISTICS ON sales.orders COLUMN (order_id);
+
+.IF ERRORCODE <> 0 THEN .QUIT 8
+.LOGOFF
+.QUIT 0

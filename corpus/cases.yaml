@@ -1,0 +1,410 @@
+# Translation corpus: each case was reviewed against Snowflake semantics before being frozen.
+# `sfmigrate eval` fails if any output, status or rule set changes.
+cases:
+- id: td-sel-abbrev
+  dialect: teradata
+  source: SEL order_id, amount FROM sales.orders WHERE status = 'open'
+  expected: SELECT order_id, amount FROM sales.orders WHERE status = 'open'
+  status: auto
+  rules: []
+- id: td-top
+  dialect: teradata
+  source: SELECT TOP 10 customer_id, total FROM sales.customers ORDER BY total DESC
+  expected: SELECT customer_id, total FROM sales.customers ORDER BY total DESC NULLS LAST LIMIT 10
+  status: auto
+  rules: []
+- id: td-qualify
+  dialect: teradata
+  source: >-
+    SELECT customer_id, order_id FROM sales.orders QUALIFY ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY
+    ordered_at DESC) = 1
+  expected: >-
+    SELECT customer_id, order_id FROM sales.orders QUALIFY ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY
+    ordered_at DESC NULLS LAST) = 1
+  status: auto
+  rules: []
+- id: td-sample
+  dialect: teradata
+  source: SELECT * FROM sales.orders SAMPLE 1000
+  expected: SELECT * FROM sales.orders TABLESAMPLE (1000 ROWS)
+  status: auto
+  rules: []
+- id: td-mod-power
+  dialect: teradata
+  source: SELECT amount MOD 7, amount ** 2 FROM sales.orders
+  expected: SELECT amount % 7, POWER(amount, 2) FROM sales.orders
+  status: auto
+  rules: []
+- id: td-zeroifnull
+  dialect: teradata
+  source: SELECT ZEROIFNULL(discount), NULLIFZERO(quantity) FROM sales.order_lines
+  expected: SELECT ZEROIFNULL(discount), NULLIFZERO(quantity) FROM sales.order_lines
+  status: auto
+  rules: []
+- id: td-index-fn
+  dialect: teradata
+  source: SELECT INDEX(email, '@') FROM crm.contacts
+  expected: SELECT CHARINDEX('@', email) FROM crm.contacts
+  status: auto
+  rules:
+  - TD008
+- id: td-char-length
+  dialect: teradata
+  source: SELECT CHARACTER_LENGTH(TRIM(name)) FROM crm.contacts
+  expected: SELECT LENGTH(TRIM(name)) FROM crm.contacts
+  status: auto
+  rules: []
+- id: td-like-any
+  dialect: teradata
+  source: SELECT * FROM crm.contacts WHERE email LIKE ANY ('%@example.com', '%@example.org')
+  expected: SELECT * FROM crm.contacts WHERE email LIKE ANY ('%@example.com', '%@example.org')
+  status: auto
+  rules: []
+- id: td-date-literal
+  dialect: teradata
+  source: SELECT * FROM sales.orders WHERE ordered_at BETWEEN DATE '2024-01-01' AND CURRENT_DATE
+  expected: >-
+    SELECT * FROM sales.orders WHERE ordered_at BETWEEN CAST('2024-01-01' AS DATE) AND CURRENT_DATE
+  status: auto
+  rules: []
+- id: td-add-months
+  dialect: teradata
+  source: SELECT ADD_MONTHS(ordered_at, 3), EXTRACT(MONTH FROM ordered_at) FROM sales.orders
+  expected: SELECT ADD_MONTHS(ordered_at, 3), DATE_PART(MONTH, ordered_at) FROM sales.orders
+  status: auto
+  rules: []
+- id: td-title
+  dialect: teradata
+  source: SELECT order_id (TITLE 'Order'), amount (TITLE 'Amount EUR') FROM sales.orders
+  expected: SELECT order_id, amount FROM sales.orders
+  status: auto
+  rules:
+  - TD010
+- id: td-cast-format
+  dialect: teradata
+  source: SELECT CAST(order_date_text AS DATE FORMAT 'YYYY-MM-DD') FROM staging.orders_raw
+  expected: SELECT DATE(order_date_text, 'yyyy-mm-DD') FROM staging.orders_raw
+  status: assisted
+  rules:
+  - TD011
+- id: td-multiset-ddl
+  dialect: teradata
+  source: >-
+    CREATE MULTISET TABLE sales.orders, NO FALLBACK, NO BEFORE JOURNAL (order_id INTEGER NOT NULL, customer_id INTEGER,
+    status VARCHAR(20) CHARACTER SET LATIN NOT CASESPECIFIC, amount DECIMAL(12,2)) PRIMARY INDEX (order_id)
+  expected: >-
+    CREATE TABLE sales.orders (order_id INT NOT NULL, customer_id INT, status VARCHAR(20) COLLATE 'en-ci', amount
+    DECIMAL(12, 2))
+  status: assisted
+  rules:
+  - TD002
+  - TD003
+  - TD004
+  - TD005
+- id: td-set-table
+  dialect: teradata
+  source: >-
+    CREATE SET TABLE crm.segments (segment_id INTEGER, name VARCHAR(50)) UNIQUE PRIMARY INDEX (segment_id)
+  expected: CREATE TABLE crm.segments (segment_id INT, name VARCHAR(50))
+  status: assisted
+  rules:
+  - TD002
+  - TD004
+- id: td-column-attrs
+  dialect: teradata
+  source: >-
+    CREATE TABLE crm.contacts (id INTEGER, created DATE FORMAT 'YYYY-MM-DD', code CHAR(2) COMPRESS, label VARCHAR(30)
+    CASESPECIFIC)
+  expected: CREATE TABLE crm.contacts (id INT, created DATE, code CHAR(2), label VARCHAR(30))
+  status: auto
+  rules:
+  - TD005
+- id: td-volatile
+  dialect: teradata
+  source: >-
+    CREATE VOLATILE TABLE vt_recent AS (SELECT * FROM sales.orders WHERE ordered_at > CURRENT_DATE - 7) WITH DATA
+    ON COMMIT PRESERVE ROWS
+  expected: >-
+    CREATE TEMPORARY TABLE vt_recent AS (SELECT * FROM sales.orders WHERE ordered_at > CURRENT_DATE - 7)
+  status: auto
+  rules:
+  - TD006
+- id: td-volatile-no-data
+  dialect: teradata
+  source: >-
+    CREATE VOLATILE TABLE vt_shape AS (SELECT * FROM sales.orders) WITH NO DATA ON COMMIT PRESERVE ROWS
+  expected: CREATE TEMPORARY TABLE vt_shape AS (SELECT * FROM sales.orders LIMIT 0)
+  status: auto
+  rules:
+  - TD006
+- id: td-collect-stats
+  dialect: teradata
+  source: COLLECT STATISTICS ON sales.orders COLUMN (customer_id)
+  expected: ''
+  status: dropped
+  rules:
+  - TD007
+- id: td-del-abbrev
+  dialect: teradata
+  source: DEL FROM staging.orders_raw WHERE loaded = 1
+  expected: DELETE FROM staging.orders_raw WHERE loaded = 1
+  status: auto
+  rules: []
+- id: td-ins-abbrev
+  dialect: teradata
+  source: INS INTO audit.runs (job, started) VALUES ('daily', CURRENT_TIMESTAMP)
+  expected: INSERT INTO audit.runs (job, started) VALUES ('daily', CURRENT_TIMESTAMP())
+  status: auto
+  rules: []
+- id: td-update-from
+  dialect: teradata
+  source: >-
+    UPDATE t FROM sales.orders t, staging.order_fixes f SET amount = f.amount WHERE t.order_id = f.order_id
+  expected: >-
+    UPDATE sales.orders AS t SET amount = f.amount FROM staging.order_fixes AS f WHERE t.order_id = f.order_id
+  status: auto
+  rules:
+  - TD009
+- id: td-upd-abbrev
+  dialect: teradata
+  source: UPD sales.orders SET status = 'closed' WHERE ordered_at < DATE '2020-01-01'
+  expected: UPDATE sales.orders SET status = 'closed' WHERE ordered_at < CAST('2020-01-01' AS DATE)
+  status: auto
+  rules: []
+- id: td-merge
+  dialect: teradata
+  source: >-
+    MERGE INTO sales.customers t USING staging.customers s ON t.customer_id = s.customer_id WHEN MATCHED THEN UPDATE
+    SET name = s.name WHEN NOT MATCHED THEN INSERT (customer_id, name) VALUES (s.customer_id, s.name)
+  expected: >-
+    MERGE INTO sales.customers AS t USING staging.customers AS s ON t.customer_id = s.customer_id WHEN MATCHED THEN
+    UPDATE SET name = s.name WHEN NOT MATCHED THEN INSERT (customer_id, name) VALUES (s.customer_id, s.name)
+  status: auto
+  rules: []
+- id: td-database
+  dialect: teradata
+  source: DATABASE sales
+  expected: USE SCHEMA sales
+  status: auto
+  rules:
+  - TD013
+- id: td-replace-view
+  dialect: teradata
+  source: >-
+    REPLACE VIEW sales.v_open AS SELECT order_id, amount FROM sales.orders WHERE status = 'open'
+  expected: >-
+    CREATE OR REPLACE VIEW sales.v_open AS SELECT order_id, amount FROM sales.orders WHERE status = 'open'
+  status: auto
+  rules: []
+- id: td-macro
+  dialect: teradata
+  source: >-
+    REPLACE MACRO sales.close_old AS (UPDATE sales.orders SET status = 'closed' WHERE ordered_at < CURRENT_DATE
+    - 365;)
+  expected: ''
+  status: manual
+  rules:
+  - TD012
+- id: td-procedure
+  dialect: teradata
+  source: CREATE PROCEDURE sales.p_refresh () BEGIN DELETE FROM sales.summary; END
+  expected: ''
+  status: manual
+  rules:
+  - TD012
+- id: td-normalize
+  dialect: teradata
+  source: SELECT NORMALIZE employee_id, duration FROM hr.assignments
+  expected: ''
+  status: manual
+  rules:
+  - TD012
+- id: ora-nvl-decode
+  dialect: oracle
+  source: >-
+    SELECT NVL(discount, 0), NVL2(coupon, 'Y', 'N'), DECODE(status, 'O', 'open', 'C', 'closed', 'other') FROM orders
+  expected: >-
+    SELECT COALESCE(discount, 0), NVL2(coupon, 'Y', 'N'), DECODE(status, 'O', 'open', 'C', 'closed', 'other') FROM
+    orders
+  status: auto
+  rules: []
+- id: ora-rownum
+  dialect: oracle
+  source: SELECT * FROM orders WHERE ROWNUM <= 100
+  expected: SELECT * FROM orders LIMIT 100
+  status: auto
+  rules:
+  - OR001
+- id: ora-rownum-filter
+  dialect: oracle
+  source: SELECT order_id FROM orders WHERE status = 'O' AND ROWNUM < 51
+  expected: SELECT order_id FROM orders WHERE status = 'O' LIMIT 50
+  status: auto
+  rules:
+  - OR001
+- id: ora-rownum-order
+  dialect: oracle
+  source: SELECT order_id, amount FROM orders WHERE ROWNUM <= 10 ORDER BY amount DESC
+  expected: >-
+    SELECT * FROM (SELECT order_id, amount FROM orders LIMIT 10) AS limited ORDER BY amount DESC
+  status: assisted
+  rules:
+  - OR001
+- id: ora-rownum-select
+  dialect: oracle
+  source: SELECT ROWNUM AS rn, order_id FROM orders
+  expected: ''
+  status: manual
+  rules:
+  - OR001
+- id: ora-outer-join
+  dialect: oracle
+  source: >-
+    SELECT o.order_id, c.name FROM orders o, customers c WHERE o.customer_id = c.customer_id(+) AND o.amount > 100
+  expected: >-
+    SELECT o.order_id, c.name FROM orders AS o LEFT JOIN customers AS c ON o.customer_id = c.customer_id WHERE o.amount
+    > 100
+  status: auto
+  rules:
+  - OR002
+- id: ora-sysdate
+  dialect: oracle
+  source: SELECT order_id FROM orders WHERE created < SYSDATE - 30
+  expected: SELECT order_id FROM orders WHERE created < DATEADD(DAY, -30, SYSDATE())
+  status: assisted
+  rules:
+  - OR003
+  - OR011
+- id: ora-systimestamp
+  dialect: oracle
+  source: INSERT INTO audit_log (event, at) VALUES ('login', SYSTIMESTAMP)
+  expected: INSERT INTO audit_log (event, at) VALUES ('login', CURRENT_TIMESTAMP())
+  status: auto
+  rules:
+  - OR003
+- id: ora-to-date
+  dialect: oracle
+  source: SELECT * FROM orders WHERE created >= TO_DATE('2024-01-01', 'YYYY-MM-DD')
+  expected: SELECT * FROM orders WHERE created >= DATE('2024-01-01', 'yyyy-mm-DD')
+  status: auto
+  rules: []
+- id: ora-to-date-time
+  dialect: oracle
+  source: SELECT * FROM orders WHERE created >= TO_DATE('2024-01-01 08:30', 'YYYY-MM-DD HH24:MI')
+  expected: >-
+    SELECT * FROM orders WHERE created >= TO_TIMESTAMP('2024-01-01 08:30', 'yyyy-mm-DD hh24:mi')
+  status: auto
+  rules:
+  - OR005
+- id: ora-to-char
+  dialect: oracle
+  source: >-
+    SELECT TO_CHAR(created, 'YYYY-MM') AS month, COUNT(*) FROM orders GROUP BY TO_CHAR(created, 'YYYY-MM')
+  expected: >-
+    SELECT TO_CHAR(created, 'YYYY-MM') AS month, COUNT(*) FROM orders GROUP BY TO_CHAR(created, 'YYYY-MM')
+  status: auto
+  rules: []
+- id: ora-minus
+  dialect: oracle
+  source: SELECT customer_id FROM customers MINUS SELECT customer_id FROM orders
+  expected: SELECT customer_id FROM customers EXCEPT SELECT customer_id FROM orders
+  status: auto
+  rules: []
+- id: ora-connect-by
+  dialect: oracle
+  source: >-
+    SELECT employee_id, manager_id, LEVEL FROM employees START WITH manager_id IS NULL CONNECT BY PRIOR employee_id
+    = manager_id
+  expected: >-
+    SELECT employee_id, manager_id, LEVEL FROM employees START WITH manager_id IS NULL CONNECT BY PRIOR employee_id
+    = manager_id
+  status: auto
+  rules:
+  - OR009
+- id: ora-sequence
+  dialect: oracle
+  source: INSERT INTO orders (order_id, amount) VALUES (orders_seq.NEXTVAL, 10)
+  expected: INSERT INTO orders (order_id, amount) VALUES (orders_seq.NEXTVAL, 10)
+  status: auto
+  rules: []
+- id: ora-ddl-types
+  dialect: oracle
+  source: >-
+    CREATE TABLE orders (order_id NUMBER(10) NOT NULL, amount NUMBER(12,2), discount NUMBER, created DATE, notes
+    CLOB, status VARCHAR2(20))
+  expected: >-
+    CREATE TABLE orders (order_id DECIMAL(10) NOT NULL, amount DECIMAL(12, 2), discount DECIMAL(38, 10), created
+    TIMESTAMPNTZ(0), notes VARCHAR, status VARCHAR(20))
+  status: assisted
+  rules:
+  - OR004
+  - OR006
+  - OR010
+- id: ora-cast-number
+  dialect: oracle
+  source: SELECT CAST(amount_text AS NUMBER) FROM staging_orders
+  expected: SELECT CAST(amount_text AS DECIMAL(38, 10)) FROM staging_orders
+  status: assisted
+  rules:
+  - OR006
+- id: ora-empty-string
+  dialect: oracle
+  source: SELECT order_id FROM orders WHERE notes = ''
+  expected: SELECT order_id FROM orders WHERE notes = ''
+  status: assisted
+  rules:
+  - OR007
+- id: ora-listagg
+  dialect: oracle
+  source: >-
+    SELECT customer_id, LISTAGG(order_id, ',') WITHIN GROUP (ORDER BY order_id) FROM orders GROUP BY customer_id
+  expected: >-
+    SELECT customer_id, LISTAGG(order_id, ',') WITHIN GROUP (ORDER BY order_id) FROM orders GROUP BY customer_id
+  status: auto
+  rules: []
+- id: ora-string-fns
+  dialect: oracle
+  source: SELECT SUBSTR(name, 1, 3), INSTR(name, 'a'), LENGTH(name), UPPER(name) FROM customers
+  expected: >-
+    SELECT SUBSTRING(name, 1, 3), CHARINDEX('a', name), LENGTH(name), UPPER(name) FROM customers
+  status: auto
+  rules: []
+- id: ora-date-fns
+  dialect: oracle
+  source: >-
+    SELECT ADD_MONTHS(created, 1), MONTHS_BETWEEN(SYSDATE, created), TRUNC(created, 'MM'), LAST_DAY(created) FROM
+    orders
+  expected: >-
+    SELECT ADD_MONTHS(created, 1), MONTHS_BETWEEN(SYSDATE(), created), DATE_TRUNC('MM', created), LAST_DAY(created)
+    FROM orders
+  status: assisted
+  rules:
+  - OR003
+- id: ora-fetch-first
+  dialect: oracle
+  source: SELECT * FROM orders ORDER BY amount DESC FETCH FIRST 5 ROWS ONLY
+  expected: SELECT * FROM orders ORDER BY amount DESC FETCH FIRST 5 ROWS ONLY
+  status: auto
+  rules: []
+- id: ora-merge
+  dialect: oracle
+  source: >-
+    MERGE INTO customers t USING staging_customers s ON (t.customer_id = s.customer_id) WHEN MATCHED THEN UPDATE
+    SET t.name = s.name WHEN NOT MATCHED THEN INSERT (customer_id, name) VALUES (s.customer_id, s.name)
+  expected: >-
+    MERGE INTO customers AS t USING staging_customers AS s ON (t.customer_id = s.customer_id) WHEN MATCHED THEN
+    UPDATE SET t.name = s.name WHEN NOT MATCHED THEN INSERT (customer_id, name) VALUES (s.customer_id, s.name)
+  status: auto
+  rules: []
+- id: ora-dual
+  dialect: oracle
+  source: SELECT 1 FROM dual
+  expected: SELECT 1 FROM dual
+  status: auto
+  rules: []
+- id: ora-regexp
+  dialect: oracle
+  source: SELECT REGEXP_REPLACE(phone, '[^0-9]', '') FROM customers
+  expected: SELECT REGEXP_REPLACE(phone, '[^0-9]', '') FROM customers
+  status: auto
+  rules: []
