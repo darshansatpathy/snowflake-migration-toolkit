@@ -11,6 +11,9 @@
 translation that says exactly what it changed and what it could not do, and row-level
 validation that proves the migrated data matches.**
 
+> Reference implementation built on synthetic or public data. It distils patterns from production
+> work into code you can run and read; it is not a client system.
+
 A migration fails in two quiet ways. SQL that translates without errors but means something
 else on Snowflake, and data that loads without errors but is not the data that was there before.
 This toolkit is built around catching both.
